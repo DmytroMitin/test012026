@@ -5,8 +5,8 @@ object Main extends App {
   val envMessage = sys.env.get("HELLO_MESSAGE")
   val stdinMessage =
     Option.when(cliMessage.isEmpty && propMessage.isEmpty && envMessage.isEmpty) {
-      scala.io.StdIn.readLine()
-    }.filter(_.nonEmpty)
+      Option(scala.io.StdIn.readLine()).filter(_.nonEmpty)
+    }.flatten
   val message = cliMessage
     .orElse(propMessage)
     .orElse(envMessage)
