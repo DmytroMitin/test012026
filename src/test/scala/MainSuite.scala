@@ -1,5 +1,3 @@
-import java.nio.charset.StandardCharsets
-
 class MainSuite extends munit.FunSuite {
   private def runMain(
       args: Seq[String] = Seq.empty,
@@ -7,31 +5,50 @@ class MainSuite extends munit.FunSuite {
       env: Map[String, String] = Map.empty,
       stdin: Option[String] = None
   ): String = {
-    val javaBin = s"${System.getProperty("java.home")}/bin/java"
-    val classpath = System.getProperty("java.class.path")
+    val javaBin = s"${sys.props("java.home")}/bin/java"
+    val scalaBinaryVersion = scala.util.Properties.versionNumberString
+      .split('.')
+      .take(2)
+      .mkString(".")
+    val mainClasses = (os.pwd / "target" / s"scala-$scalaBinaryVersion" / "classes").toString
+    val scalaVersion = scala.util.Properties.versionNumberString
+    val scalaLibraryFromClass = new java.io.File(
+      classOf[scala.App].getProtectionDomain.getCodeSource.getLocation.toURI
+    ).getPath
+    val scalaLibraryCandidates = Seq(
+      os.pwd / ".coursier-local" / "v1" / "https" / "repo1.maven.org" / "maven2" / "org" / "scala-lang" / "scala-library" / scalaVersion / s"scala-library-$scalaVersion.jar",
+      os.pwd / ".ivy2-local" / "cache" / "org.scala-lang" / "scala-library" / "jars" / s"scala-library-$scalaVersion.jar",
+      os.Path(sys.props("user.home")) / ".cache" / "coursier" / "v1" / "https" / "repo1.maven.org" / "maven2" / "org" / "scala-lang" / "scala-library" / scalaVersion / s"scala-library-$scalaVersion.jar",
+      os.Path(sys.props("user.home")) / ".ivy2" / "cache" / "org.scala-lang" / "scala-library" / "jars" / s"scala-library-$scalaVersion.jar"
+    )
+    val scalaLibrary = scalaLibraryCandidates.find(os.exists).map(_.toString).getOrElse(scalaLibraryFromClass)
+    val classpath = Seq(mainClasses, scalaLibrary).mkString(java.io.File.pathSeparator)
     val propArgs = props.toSeq.flatMap { case (key, value) => Seq(s"-D${key}=${value}") }
     val cmd = Seq(javaBin, "-cp", classpath) ++ propArgs ++ Seq("Main") ++ args
 
-    val pb = new ProcessBuilder(cmd: _*)
-    pb.redirectErrorStream(true)
-    val pbEnv = pb.environment()
-    env.foreach { case (key, value) => pbEnv.put(key, value) }
-
-    val process = pb.start()
-    stdin match {
-      case Some(input) =>
-        val os = process.getOutputStream
-        os.write(input.getBytes(StandardCharsets.UTF_8))
-        os.flush()
-        os.close()
-      case None =>
-        process.getOutputStream.close()
+    val result = scala.util.Using(
+      os
+        .proc(cmd)
+        .spawn(
+          cwd = os.pwd,
+          env = env,
+          stdin = os.Pipe,
+          stdout = os.Pipe,
+          stderr = os.Pipe,
+          mergeErrIntoOut = true
+        )
+    ) { subProcess =>
+      stdin.foreach(subProcess.stdin.write)
+      subProcess.stdin.flush()
+      subProcess.stdin.close()
+      subProcess.waitFor()
+      val output = subProcess.stdout.text()
+      val exitCode = subProcess.exitCode()
+      assertEquals(exitCode, 0, s"process exited with $exitCode and output: $output")
+      output.trim
     }
 
-    val output = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-    val exitCode = process.waitFor()
-    assertEquals(exitCode, 0, s"process exited with $exitCode and output: $output")
-    output.trim
+    result.get
   }
 
   test("CLI arg takes effect") {
