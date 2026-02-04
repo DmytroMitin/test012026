@@ -4,6 +4,7 @@ lazy val root = (project in file("."))
   .settings(
     name := "hello-world",
     libraryDependencies ++= Seq(
+      "com.typesafe" % "config" % "1.4.3",
       "org.scalameta" %% "munit" % "1.2.2" % Test,
       "com.lihaoyi" %% "os-lib" % "0.11.8" % Test
     ),

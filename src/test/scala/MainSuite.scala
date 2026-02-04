@@ -22,7 +22,10 @@ class MainSuite extends munit.FunSuite {
       os.Path(sys.props("user.home")) / ".ivy2" / "cache" / "org.scala-lang" / "scala-library" / "jars" / s"scala-library-$scalaVersion.jar"
     )
     val scalaLibrary = scalaLibraryCandidates.find(os.exists).map(_.toString).getOrElse(scalaLibraryFromClass)
-    val classpath = Seq(mainClasses, scalaLibrary).mkString(java.io.File.pathSeparator)
+    val configJar = new java.io.File(
+      classOf[com.typesafe.config.ConfigFactory].getProtectionDomain.getCodeSource.getLocation.toURI
+    ).getPath
+    val classpath = Seq(mainClasses, scalaLibrary, configJar).mkString(java.io.File.pathSeparator)
     val propArgs = props.toSeq.flatMap { case (key, value) => Seq(s"-D${key}=${value}") }
     val cmd = Seq(javaBin, "-cp", classpath) ++ propArgs ++ Seq("Main") ++ args
 
@@ -64,6 +67,12 @@ class MainSuite extends munit.FunSuite {
   test("Env var takes effect") {
     val result = runMain(env = Map("HELLO_MESSAGE" -> "From env"))
     assertEquals(result, "From env")
+  }
+
+  test("Typesafe config takes effect") {
+    val configFile = os.temp(contents = """hello.message = "From config"""")
+    val result = runMain(props = Map("config.file" -> configFile.toString))
+    assertEquals(result, "From config")
   }
 
   test("stdin input takes effect") {
