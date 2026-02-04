@@ -27,8 +27,9 @@ The message is selected by this precedence (highest to lowest):
 1. CLI argument (first arg)
 2. JVM property `hello.message`
 3. Environment variable `HELLO_MESSAGE`
-4. Standard input (first non-empty line)
-5. Default message (`Hello, world!`)
+4. Typesafe config key `hello.message`
+5. Standard input (first non-empty line)
+6. Default message (`Hello, world!`)
 
 Examples:
 
@@ -42,6 +43,14 @@ sbt -Dhello.message="From JVM" run
 
 ```bash
 HELLO_MESSAGE="From env" sbt run
+```
+
+```bash
+cat > application.conf <<'EOF'
+hello.message = "From config"
+EOF
+
+sbt run
 ```
 
 ```bash

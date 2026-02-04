@@ -66,6 +66,12 @@ class MainSuite extends munit.FunSuite {
     assertEquals(result, "From env")
   }
 
+  test("Typesafe config takes effect") {
+    val configFile = os.temp(contents = """hello.message = "From config"""")
+    val result = runMain(props = Map("config.file" -> configFile.toString))
+    assertEquals(result, "From config")
+  }
+
   test("stdin input takes effect") {
     val result = runMain(stdin = Some("From stdin\n"))
     assertEquals(result, "From stdin")
